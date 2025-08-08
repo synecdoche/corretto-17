@@ -822,6 +822,8 @@ public class InetAddress implements java.io.Serializable {
     private static final class NameServiceAddresses implements Addresses {
         private final String host;
         private final InetAddress reqAddr;
+        private boolean requestComplete;
+        private InetAddress[] inetAddresses;
 
         NameServiceAddresses(String host, InetAddress reqAddr) {
             this.host = host;
@@ -834,6 +836,9 @@ public class InetAddress implements java.io.Serializable {
             // only one thread is doing lookup to name service
             // for particular host at any time.
             synchronized (this) {
+                if (InetAddressCachePolicy.getCoalesceInFlightRequests() && requestComplete) {
+                    return inetAddresses;
+                }
                 // re-check that we are still us + re-install us if slot empty
                 addresses = cache.putIfAbsent(host, this);
                 if (addresses == null) {
@@ -845,7 +850,6 @@ public class InetAddress implements java.io.Serializable {
                 // still us ?
                 if (addresses == this) {
                     // lookup name services
-                    InetAddress[] inetAddresses;
                     UnknownHostException ex;
                     int cachePolicy;
                     try {
@@ -857,6 +861,7 @@ public class InetAddress implements java.io.Serializable {
                         ex = uhe;
                         cachePolicy = InetAddressCachePolicy.getNegative();
                     }
+                    requestComplete = true;
                     // remove or replace us with cached addresses according to cachePolicy
                     if (cachePolicy == InetAddressCachePolicy.NEVER) {
                         cache.remove(host, this);

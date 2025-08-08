@@ -42,6 +42,11 @@ public final class InetAddressCachePolicy {
     private static final String negativeCachePolicyPropFallback =
         "sun.net.inetaddr.negative.ttl";
 
+    private static final String coalesceInFlightRequestsProp =
+        "networkaddress.coalesceinflightrequests";
+    private static final String coalesceInFlightRequestsPropFallback =
+        "sun.net.inetaddr.coalesceinflightrequests";
+
     public static final int FOREVER = -1;
     public static final int NEVER = 0;
 
@@ -69,6 +74,8 @@ public final class InetAddressCachePolicy {
      */
     private static volatile int negativeCachePolicy = NEVER;
 
+    private static volatile boolean coalesceInFlightRequestsPolicy = true;
+
     /*
      * Whether or not the cache policy for successful lookups was set
      * using a property (cmd line).
@@ -81,6 +88,8 @@ public final class InetAddressCachePolicy {
      */
     private static boolean propertyNegativeSet;
 
+
+    private static boolean propertyCoalesceInFlightSet;
     /*
      * Initialize
      */
@@ -149,6 +158,28 @@ public final class InetAddressCachePolicy {
             negativeCachePolicy = tmp < 0 ? FOREVER : tmp;
             propertyNegativeSet = true;
         }
+
+        // coalesce in-flight
+        Boolean coalesce = java.security.AccessController.doPrivileged (
+          new PrivilegedAction<Boolean>() {
+            public Boolean run() {
+                    String tmpString = Security.getProperty(coalesceInFlightRequestsProp);
+                    if (tmpString != null) {
+                        return Boolean.parseBoolean(tmpString);
+                    }
+
+                    tmpString = System.getProperty(coalesceInFlightRequestsPropFallback);
+                    if (tmpString != null) {
+                        return Boolean.parseBoolean(tmpString);
+                    }
+                return null;
+            }
+          });
+
+        if (coalesce != null) {
+            coalesceInFlightRequestsPolicy = coalesce;
+            propertyCoalesceInFlightSet = true;
+        }
     }
 
     public static int get() {
@@ -157,6 +188,10 @@ public final class InetAddressCachePolicy {
 
     public static int getNegative() {
         return negativeCachePolicy;
+    }
+
+    public static boolean getCoalesceInFlightRequests() {
+        return coalesceInFlightRequestsPolicy;
     }
 
     /**
